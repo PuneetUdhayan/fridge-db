@@ -1,0 +1,532 @@
+{
+  "name": "Fridge DB",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "hour": 7,
+              "minute": 45
+            },
+            {
+              "hour": 12,
+              "minute": 30
+            },
+            {
+              "hour": 19,
+              "minute": 45
+            }
+          ]
+        },
+        "simple": false,
+        "filters": {},
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        0
+      ],
+      "id": "cb4a1f7b-30dd-4181-ac71-f14bcbd8c887",
+      "name": "Gmail Trigger",
+      "notesInFlow": false,
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "sw6UMgSXHZuETmOi",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "text": "={{ $json[\"html\"] }}",
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"items_list\": {\n      \"type\": \"array\",\n      \"description\": \"A list of all the food and grocery items from the email receipt.\",\n      \"items\": {\n        \"type\": \"object\",\n        \"properties\": {\n          \"quantity\": {\n            \"type\": \"number\",\n            \"description\": \"The numerical quantity of the item. For '2 x Apples', this would be 2.\"\n          },\n          \"item_name\": {\n            \"type\": \"string\",\n            \"description\": \"The full name of the food or grocery item, without the quantity. For '1 x Licious Chicken Curry Cut', this is 'Licious Chicken Curry Cut'.\"\n          }\n        },\n        \"required\": [\n          \"quantity\",\n          \"item_name\"\n        ]\n      }\n    }\n  },\n  \"required\": [\n    \"items_list\"\n  ]\n}\n\n",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.informationExtractor",
+      "typeVersion": 1.2,
+      "position": [
+        352,
+        0
+      ],
+      "id": "cae564c8-32a4-4ee4-87a3-120e3f0be61e",
+      "name": "Information Extractor"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "ab673d3b-4025-47d2-8386-334f589c5e97",
+              "leftValue": "={{ $json.from.value[0].address }}",
+              "rightValue": "noreply@swiggy.in",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "949b85a3-2954-4759-9358-fb0f53c6ec3c",
+              "leftValue": "={{ $json.from.value[0].address }}",
+              "rightValue": "noreply@zomato.com",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.2,
+      "position": [
+        176,
+        0
+      ],
+      "id": "76ca0cc9-e093-468c-a370-efc6cd318e82",
+      "name": "Filter"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4.1-mini"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        352,
+        208
+      ],
+      "id": "6cf73168-991e-4120-8240-e98a96aa4900",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "Mot0svIKkowOtbDU",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -176,
+        208
+      ],
+      "id": "d2d273ac-f831-4985-91c2-0366d33e0de8",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "table": {
+          "__rl": true,
+          "value": "items",
+          "mode": "list",
+          "cachedResultName": "items"
+        },
+        "dataMode": "defineBelow",
+        "valuesToSend": {
+          "values": [
+            {
+              "column": "item",
+              "value": "={{ $('Split Out1').item.json.item_name }}"
+            },
+            {
+              "column": "quantity",
+              "value": "={{ $('Split Out1').item.json.quantity }}"
+            },
+            {
+              "column": "expires_on",
+              "value": "={{ $json.expiryDate }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        1248,
+        0
+      ],
+      "id": "e3be72a3-1e9f-4014-ac84-08c5def1d422",
+      "name": "Insert rows in a table",
+      "credentials": {
+        "mySql": {
+          "id": "sCXLNm3CArqVISg3",
+          "name": "MySQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "Item:\n{{ $json[\"item_name\"] }}",
+        "hasOutputParser": true,
+        "messages": {
+          "messageValues": [
+            {
+              "message": "You are an AI system that calculates the shelf life of food and grocery items. Your sole function is to return a single integer representing the recommended number of days to consume an item after purchase, assuming it is stored correctly in a pantry or refrigerator. "
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.7,
+      "position": [
+        816,
+        0
+      ],
+      "id": "a2cc4b7e-6e5a-4920-a7a6-d3b180e5c6db",
+      "name": "Basic LLM Chain"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "chatgpt-4o-latest",
+          "mode": "list",
+          "cachedResultName": "chatgpt-4o-latest"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        816,
+        192
+      ],
+      "id": "10719e7a-805e-4087-ac81-08ee274fb470",
+      "name": "OpenAI Chat Model1",
+      "credentials": {
+        "openAiApi": {
+          "id": "Mot0svIKkowOtbDU",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n\t\"type\": \"object\",\n\t\"properties\": {\n\t\t\"shelfLifeDays\": {\n\t\t\t\"description\": \"The recommended shelf life in days, from 1 to 365.\",\n\t\t\t\"type\": \"integer\",\n\t\t\t\"minimum\": 1,\n\t\t\t\"maximum\": 365\n\t\t}\n\t},\n\t\"required\": [\n\t\t\"shelfLifeDays\"\n\t]\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        960,
+        192
+      ],
+      "id": "ed6b9604-f6f6-48c2-9c33-e388c4620c0b",
+      "name": "Structured Output Parser1"
+    },
+    {
+      "parameters": {
+        "operation": "addToDate",
+        "magnitude": "={{ $now }}",
+        "duration": "={{ $json.output.shelfLifeDays }}",
+        "outputFieldName": "expiryDate",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dateTime",
+      "typeVersion": 2,
+      "position": [
+        1104,
+        0
+      ],
+      "id": "95675c02-2f72-487c-9d9c-d8a124ab313e",
+      "name": "Date & Time"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT *\nFROM items\nWHERE expires_on > '{{ $now }}'\nORDER BY expires_on ASC\nLIMIT 10;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.5,
+      "position": [
+        1408,
+        0
+      ],
+      "id": "27d64cfc-37ca-4ecd-b815-1cf8cd7f92dc",
+      "name": "Execute a SQL query",
+      "credentials": {
+        "mySql": {
+          "id": "sCXLNm3CArqVISg3",
+          "name": "MySQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "daproj10@gmail.com",
+        "subject": "Fridge DB",
+        "message": "=Things that are bout to expire yo:\\n\n{{ $json.item }}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1728,
+        0
+      ],
+      "id": "ee729c2f-ec75-4031-bb94-6d89e2f750bf",
+      "name": "Send a message",
+      "webhookId": "cfd19993-2664-4a30-9a37-42dfe860bb30",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "sw6UMgSXHZuETmOi",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "limit": 10,
+        "simple": false,
+        "filters": {
+          "q": "swiggy"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        208
+      ],
+      "id": "1822264b-2412-4af1-b647-88197ba8ca76",
+      "name": "Get many messages",
+      "webhookId": "5d74edd4-2dd3-430a-b2fe-75e0ba5e147b",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "sw6UMgSXHZuETmOi",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "output.items_list",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        640,
+        0
+      ],
+      "id": "b5410326-f364-4ff4-94a0-24ad3edf6ba7",
+      "name": "Split Out1"
+    },
+    {
+      "parameters": {
+        "fieldsToAggregate": {
+          "fieldToAggregate": [
+            {
+              "fieldToAggregate": "item"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        1568,
+        0
+      ],
+      "id": "647d00c7-b56b-46be-9465-47c34f3be9c6",
+      "name": "Aggregate"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Gmail Trigger": {
+      "main": [
+        [
+          {
+            "node": "Filter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter": {
+      "main": [
+        [
+          {
+            "node": "Information Extractor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Information Extractor",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Get many messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Information Extractor": {
+      "main": [
+        [
+          {
+            "node": "Split Out1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic LLM Chain": {
+      "main": [
+        [
+          {
+            "node": "Date & Time",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser1": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Date & Time": {
+      "main": [
+        [
+          {
+            "node": "Insert rows in a table",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert rows in a table": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query": {
+      "main": [
+        [
+          {
+            "node": "Aggregate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get many messages": {
+      "main": [
+        [
+          {
+            "node": "Filter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out1": {
+      "main": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Kolkata",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "a199ae7f-e95e-4342-8176-1d84be489c5d",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "df7c1f81f896ea919d25787f96c75e0d364be131558e69e821017bc0768849af"
+  },
+  "id": "uQYyGOGZKMXkGfFq",
+  "tags": []
+}
